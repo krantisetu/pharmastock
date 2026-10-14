@@ -424,29 +424,39 @@ export async function createSaleInvoice(data: CreateSaleInput) {
 }
 
 export async function getScheduleH1Logs() {
-  const tenant = await getTenant();
-  if (!tenant) return [];
+  try {
+    const tenant = await getTenant();
+    if (!tenant) return [];
 
-  return await prisma.scheduleH1Log.findMany({
-    where: { tenantId: tenant.id },
-    orderBy: { date: "desc" },
-  });
+    return await prisma.scheduleH1Log.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: { date: "desc" },
+    });
+  } catch (err) {
+    console.error("Error in getScheduleH1Logs:", err);
+    return [];
+  }
 }
 
 export async function getCustomers() {
-  const tenant = await getTenant();
-  if (!tenant) return [];
+  try {
+    const tenant = await getTenant();
+    if (!tenant) return [];
 
-  return await prisma.customer.findMany({
-    where: { tenantId: tenant.id },
-    include: {
-      sales: {
-        orderBy: { createdAt: "desc" },
-        take: 5,
+    return await prisma.customer.findMany({
+      where: { tenantId: tenant.id },
+      include: {
+        sales: {
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        },
       },
-    },
-    orderBy: { name: "asc" },
-  });
+      orderBy: { name: "asc" },
+    });
+  } catch (err) {
+    console.error("Error in getCustomers:", err);
+    return [];
+  }
 }
 
 export async function recordKhataPayment(customerId: string, amount: number) {
@@ -471,18 +481,23 @@ export async function recordKhataPayment(customerId: string, amount: number) {
 }
 
 export async function getSuppliers() {
-  const tenant = await getTenant();
-  if (!tenant) return [];
+  try {
+    const tenant = await getTenant();
+    if (!tenant) return [];
 
-  return await prisma.supplier.findMany({
-    where: { tenantId: tenant.id },
-    include: {
-      batches: {
-        include: { medicine: true },
+    return await prisma.supplier.findMany({
+      where: { tenantId: tenant.id },
+      include: {
+        batches: {
+          include: { medicine: true },
+        },
       },
-    },
-    orderBy: { name: "asc" },
-  });
+      orderBy: { name: "asc" },
+    });
+  } catch (err) {
+    console.error("Error in getSuppliers:", err);
+    return [];
+  }
 }
 
 export async function addMedicine(formData: {

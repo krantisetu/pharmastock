@@ -1,15 +1,11 @@
-import { prisma } from "@/lib/prisma";
-import { getTenant } from "@/lib/actions";
+import { getTenant, getScheduleH1Logs } from "@/lib/actions";
 import { ShieldCheck, FileText, Printer, AlertTriangle } from "lucide-react";
 
 export default async function ScheduleH1Page() {
-  const tenant = await getTenant();
-  if (!tenant) return null;
-
-  const logs = await prisma.scheduleH1Log.findMany({
-    where: { tenantId: tenant.id },
-    orderBy: { date: "desc" },
-  });
+  const [tenant, logs] = await Promise.all([
+    getTenant(),
+    getScheduleH1Logs(),
+  ]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-4 sm:p-6 pb-24 md:pb-8 print:p-0 print:bg-white">
