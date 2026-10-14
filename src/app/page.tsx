@@ -26,27 +26,36 @@ export default async function DashboardPage() {
   const stats = await getDashboardStats();
   if (!stats) return null;
 
-  const [recentSales, topMedicines] = await Promise.all([
-    prisma.saleInvoice.findMany({
-      where: { tenantId: stats.tenant.id },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      include: {
-        items: {
-          include: { medicine: true, batch: true },
+  let recentSales: any[] = [];
+  let topMedicines: any[] = [];
+
+  try {
+    const [sales, meds] = await Promise.all([
+      prisma.saleInvoice.findMany({
+        where: { tenantId: stats.tenant.id },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: {
+          items: {
+            include: { medicine: true, batch: true },
+          },
         },
-      },
-    }),
-    prisma.medicine.findMany({
-      where: { tenantId: stats.tenant.id },
-      include: {
-        batches: {
-          where: { quantity: { gt: 0 } },
+      }),
+      prisma.medicine.findMany({
+        where: { tenantId: stats.tenant.id },
+        include: {
+          batches: {
+            where: { quantity: { gt: 0 } },
+          },
         },
-      },
-      take: 5,
-    }),
-  ]);
+        take: 5,
+      }),
+    ]);
+    recentSales = sales;
+    topMedicines = meds;
+  } catch (err) {
+    console.error("Dashboard query warning:", err);
+  }
 
   // Mock weekly activity bars for Behance chart styling
   const weeklyActivity = [
@@ -343,11 +352,11 @@ export default async function DashboardPage() {
             </div>
 
             <div className="mt-3 divide-y divide-slate-100">
-              {topMedicines.map((med) => {
-                const totalStock = med.batches.reduce(
-                  (acc, b) => acc + b.quantity,
+              {topMedicines.map((med: any) => {
+                const totalStock = med.batches?.reduce(
+                  (acc: number, b: any) => acc + b.quantity,
                   0
-                );
+                ) || 0;
                 return (
                   <div
                     key={med.id}
