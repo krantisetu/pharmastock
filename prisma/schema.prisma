@@ -1,0 +1,295 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  PHARMACIST
+  BILLER
+}
+
+enum Category {
+  ALLOPATHY
+  AYURVEDIC
+  OTC
+  SURGICAL
+  HOMEOPATHY
+  GENERAL
+}
+
+enum ScheduleType {
+  GENERAL
+  SCHEDULE_H
+  SCHEDULE_H1
+  SCHEDULE_X
+  NARCOTIC
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  CARD
+  CREDIT_KHATA
+  SPLIT
+}
+
+enum PaymentStatus {
+  PAID
+  PENDING
+  PARTIAL
+}
+
+model Tenant {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  ownerName   String
+  phone       String
+  email       String?
+  address     String   @db.Text
+  city        String   @default("Kolhapur")
+  state       String   @default("Maharashtra")
+  pincode     String   @default("416008")
+  dlNumber    String   @default("MH-KOP-20B-184920 / 21B-184921")
+  gstin       String   @default("27AABCM8291Q1Z4")
+  fssai       String?  @default("11521034000123")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users           User[]
+  medicines       Medicine[]
+  batches         Batch[]
+  suppliers       Supplier[]
+  customers       Customer[]
+  sales           SaleInvoice[]
+  purchases       PurchaseInvoice[]
+  scheduleH1Logs  ScheduleH1Log[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  email     String   @unique
+  phone     String?
+  role      Role     @default(PHARMACIST)
+  password  String   @default("admin123")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model Medicine {
+  id                   String       @id @default(cuid())
+  tenantId             String
+  tenant               Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                 String
+  genericName          String       @db.Text
+  brand                String
+  category             Category     @default(ALLOPATHY)
+  dosageForm           String       @default("TABLET")
+  packaging            String       @default("10 Tablets/Strip")
+  unitsPerPack         Int          @default(10)
+  hsnCode              String       @default("3004")
+  gstRate              Float        @default(12.0)
+  scheduleType         ScheduleType @default(GENERAL)
+  barcode              String?
+  minStockLevel        Int          @default(10)
+  rackLocation         String?
+  prescriptionRequired Boolean      @default(false)
+  isActive             Boolean      @default(true)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  batches       Batch[]
+  saleItems     SaleItem[]
+  purchaseItems PurchaseItem[]
+
+  @@index([tenantId])
+  @@index([name])
+  @@index([barcode])
+}
+
+model Batch {
+  id                String    @id @default(cuid())
+  tenantId          String
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  medicineId        String
+  medicine          Medicine  @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  batchNumber       String
+  expiryDate        DateTime
+  manufacturingDate DateTime?
+  mrp               Float
+  purchaseRate      Float
+  saleRate          Float
+  quantity          Int       @default(0)
+  initialQuantity   Int       @default(0)
+  supplierId        String?
+  supplier          Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  saleItems     SaleItem[]
+  purchaseItems PurchaseItem[]
+
+  @@index([tenantId])
+  @@index([medicineId])
+  @@index([batchNumber])
+  @@index([expiryDate])
+}
+
+model Supplier {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  contactPerson String?
+  phone         String
+  email         String?
+  address       String   @db.Text
+  city          String   @default("Kolhapur")
+  gstin         String?
+  dlNumber      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  batches   Batch[]
+  purchases PurchaseInvoice[]
+
+  @@index([tenantId])
+}
+
+model Customer {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String
+  phone         String
+  address       String?  @db.Text
+  doctorName    String?
+  doctorRegNo   String?
+  creditBalance Float    @default(0.0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sales SaleInvoice[]
+
+  @@index([tenantId])
+  @@index([phone])
+}
+
+model SaleInvoice {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoiceNumber  String
+  customerId     String?
+  customer       Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName   String        @default("Cash Customer")
+  customerPhone  String?
+  doctorName     String?
+  doctorRegNo    String?
+  subtotal       Float         @default(0.0)
+  discountAmount Float         @default(0.0)
+  cgstAmount     Float         @default(0.0)
+  sgstAmount     Float         @default(0.0)
+  totalAmount    Float         @default(0.0)
+  paymentMode    PaymentMode   @default(CASH)
+  paymentStatus  PaymentStatus @default(PAID)
+  notes          String?       @db.Text
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  items SaleItem[]
+
+  @@index([tenantId])
+  @@index([invoiceNumber])
+  @@index([createdAt])
+}
+
+model SaleItem {
+  id              String      @id @default(cuid())
+  saleId          String
+  sale            SaleInvoice @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  medicineId      String
+  medicine        Medicine    @relation(fields: [medicineId], references: [id], onDelete: Restrict)
+  batchId         String
+  batch           Batch       @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  quantity        Int
+  unitPrice       Float
+  mrp             Float
+  discountPercent Float       @default(0.0)
+  gstRate         Float       @default(12.0)
+  cgstAmount      Float       @default(0.0)
+  sgstAmount      Float       @default(0.0)
+  totalAmount     Float
+
+  @@index([saleId])
+  @@index([medicineId])
+  @@index([batchId])
+}
+
+model PurchaseInvoice {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoiceNumber String
+  supplierId    String
+  supplier      Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  invoiceDate   DateTime @default(now())
+  subtotal      Float    @default(0.0)
+  taxAmount     Float    @default(0.0)
+  totalAmount   Float    @default(0.0)
+  status        String   @default("RECEIVED")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  items PurchaseItem[]
+
+  @@index([tenantId])
+  @@index([supplierId])
+}
+
+model PurchaseItem {
+  id           String          @id @default(cuid())
+  purchaseId   String
+  purchase     PurchaseInvoice @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  medicineId   String
+  medicine     Medicine        @relation(fields: [medicineId], references: [id], onDelete: Restrict)
+  batchId      String
+  batch        Batch           @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  quantity     Int
+  purchaseRate Float
+  mrp          Float
+  gstRate      Float           @default(12.0)
+
+  @@index([purchaseId])
+  @@index([medicineId])
+}
+
+model ScheduleH1Log {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  date          DateTime @default(now())
+  medicineName  String
+  batchNumber   String
+  quantity      Int
+  patientName   String
+  patientAddress String?
+  patientPhone  String?
+  doctorName    String
+  doctorAddress String?
+  doctorRegNo   String?
+  invoiceNumber String
+
+  @@index([tenantId])
+  @@index([date])
+}
