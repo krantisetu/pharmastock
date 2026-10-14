@@ -606,3 +606,126 @@ export async function addBatch(data: {
   revalidatePath("/");
   return batch;
 }
+
+export interface BulkMedicineRow {
+  name: string;
+  genericName: string;
+  brand?: string;
+  category?: string;
+  dosageForm?: string;
+  packaging?: string;
+  unitsPerPack?: number;
+  hsnCode?: string;
+  gstRate?: number;
+  scheduleType?: string;
+  barcode?: string;
+  rackLocation?: string;
+  minStockLevel?: number;
+  batchNumber?: string;
+  expiryDate?: string;
+  mrp?: number;
+  purchaseRate?: number;
+  saleRate?: number;
+  quantity?: number;
+}
+
+export async function importMedicinesBulk(rows: BulkMedicineRow[]) {
+  const tenant = await getTenant();
+  if (!tenant) throw new Error("Tenant not found");
+
+  if (!rows || rows.length === 0) {
+    throw new Error("No medicine rows to import");
+  }
+
+  let importedCount = 0;
+
+  for (const row of rows) {
+    if (!row.name || !row.genericName) continue;
+
+    // Check if medicine already exists under this tenant
+    let medicine = await prisma.medicine.findFirst({
+      where: {
+        tenantId: tenant.id,
+        name: row.name.trim(),
+      },
+    });
+
+    if (!medicine) {
+      medicine = await prisma.medicine.create({
+        data: {
+          tenantId: tenant.id,
+          name: row.name.trim(),
+          genericName: row.genericName.trim(),
+          brand: row.brand ? row.brand.trim() : "Generic / Standard",
+          category: (row.category?.toUpperCase() as any) || "ALLOPATHY",
+          dosageForm: row.dosageForm?.toUpperCase() || "TABLET",
+          packaging: row.packaging || "10 Tablets/Strip",
+          unitsPerPack: Number(row.unitsPerPack || 10),
+          hsnCode: row.hsnCode || "3004",
+          gstRate: Number(row.gstRate || 12.0),
+          scheduleType: (row.scheduleType?.toUpperCase() as any) || "GENERAL",
+          barcode: row.barcode ? row.barcode.trim() : null,
+          minStockLevel: Number(row.minStockLevel || 10),
+          rackLocation: row.rackLocation ? row.rackLocation.trim() : null,
+        },
+      });
+    }
+
+    // Add or update batch if batch info is provided
+    if (row.batchNumber && row.expiryDate) {
+      const expDate = new Date(row.expiryDate);
+      const validExp = isNaN(expDate.getTime())
+        ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+        : expDate;
+
+      const qty = Number(row.quantity || 0);
+      const mrp = Number(row.mrp || 0);
+      const purchaseRate = Number(row.purchaseRate || mrp * 0.75);
+      const saleRate = Number(row.saleRate || mrp);
+
+      const existingBatch = await prisma.batch.findFirst({
+        where: {
+          tenantId: tenant.id,
+          medicineId: medicine.id,
+          batchNumber: row.batchNumber.trim(),
+        },
+      });
+
+      if (existingBatch) {
+        await prisma.batch.update({
+          where: { id: existingBatch.id },
+          data: {
+            quantity: { increment: qty },
+            mrp: mrp > 0 ? mrp : existingBatch.mrp,
+            saleRate: saleRate > 0 ? saleRate : existingBatch.saleRate,
+            purchaseRate: purchaseRate > 0 ? purchaseRate : existingBatch.purchaseRate,
+            expiryDate: validExp,
+          },
+        });
+      } else {
+        await prisma.batch.create({
+          data: {
+            tenantId: tenant.id,
+            medicineId: medicine.id,
+            batchNumber: row.batchNumber.trim(),
+            expiryDate: validExp,
+            mrp,
+            purchaseRate,
+            saleRate,
+            quantity: qty,
+            initialQuantity: qty,
+          },
+        });
+      }
+    }
+
+    importedCount++;
+  }
+
+  revalidatePath("/inventory");
+  revalidatePath("/pos");
+  revalidatePath("/");
+
+  return { success: true, count: importedCount };
+}
+

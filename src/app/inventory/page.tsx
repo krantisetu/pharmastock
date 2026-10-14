@@ -13,8 +13,10 @@ import {
   Barcode,
   Calendar,
   Layers,
+  FileSpreadsheet,
 } from "lucide-react";
 import { getMedicines, addMedicine, getSuppliers } from "@/lib/actions";
+import { ImportModal } from "@/components/inventory/ImportModal";
 
 export default function InventoryPage() {
   const [medicines, setMedicines] = useState<any[]>([]);
@@ -22,6 +24,7 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   // Form states for new medicine
@@ -127,13 +130,22 @@ export default function InventoryPage() {
               Manage inventory, FEFO batch expiry dates, and shelf locations
             </p>
           </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm shadow-teal-600/20 active:scale-95 transition-all"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add New Medicine</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-700 shadow-2xs active:scale-95 transition-all"
+            >
+              <FileSpreadsheet className="h-4 w-4 text-teal-600" />
+              <span>Import CSV / Excel</span>
+            </button>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm shadow-teal-600/20 active:scale-95 transition-all"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add New Medicine</span>
+            </button>
+          </div>
         </div>
 
         {/* Search & Category Filter */}
@@ -576,6 +588,13 @@ export default function InventoryPage() {
           </div>
         </div>
       )}
+
+      {/* Bulk CSV / Excel Import Modal */}
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={loadData}
+      />
     </div>
   );
 }
